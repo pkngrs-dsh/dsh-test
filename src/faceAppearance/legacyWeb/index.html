@@ -1,0 +1,76 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="theme-color" content="#203c32">
+  <meta name="referrer" content="same-origin">
+  <title>FaceAppearance · 远端重建预览</title>
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='9' fill='%23203c32'/%3E%3Cpath d='M10 23V9h13M10 16h10' fill='none' stroke='%23b6e7cb' stroke-width='3'/%3E%3C/svg%3E">
+  <link rel="stylesheet" href="./styles.css">
+  <script type="importmap">{"imports":{"three":"/viewer-common/vendor/three.module.js"}}</script>
+  <script type="module" src="./app.js"></script>
+</head>
+<body>
+  <svg class="symbols" aria-hidden="true"><defs>
+    <symbol id="icon-cube" viewBox="0 0 24 24"><path d="m12 3 9 5v9l-9 5-9-5V8l9-5Zm0 10 9-5M12 13 3 8m9 5v9M7.5 5.5l9 5"/></symbol>
+    <symbol id="icon-upload" viewBox="0 0 24 24"><path d="M12 16V3m-5 5 5-5 5 5M4 15v6h16v-6"/></symbol>
+    <symbol id="icon-download" viewBox="0 0 24 24"><path d="M12 3v13m-5-5 5 5 5-5M4 16v5h16v-5"/></symbol>
+    <symbol id="icon-reset" viewBox="0 0 24 24"><path d="M4 10a8 8 0 1 1 1 8M4 4v6h6"/></symbol>
+    <symbol id="icon-camera" viewBox="0 0 24 24"><path d="M3 7h5l2-3h4l2 3h5v14H3Z"/><circle cx="12" cy="13" r="4"/></symbol>
+    <symbol id="icon-copy" viewBox="0 0 24 24"><path d="M8 8h13v13H8ZM3 16V3h13"/></symbol>
+  </defs></svg>
+  <header class="app-header">
+    <a class="brand" href="./"><span class="brand-mark">F<span>·</span></span><span>FaceAppearance<small>远端重建 · 本地预览</small></span></a>
+    <div class="header-actions"><span class="engine-badge">UV FACE FUSION</span><span id="connection" class="connection" role="status" data-state="pending">正在连接服务</span><button id="reconnect" class="icon-button" title="重新连接服务" aria-label="重新连接服务"><svg><use href="#icon-reset"/></svg></button></div>
+  </header>
+  <main class="workspace">
+    <aside class="sidebar">
+      <section class="input-section" aria-labelledby="input-title">
+        <div class="section-heading"><span class="step-number">01</span><h1 id="input-title">选择重建照片</h1><span id="file-count" class="count">0 / 16</span></div>
+        <p class="section-copy">照片发送到服务器重建，<br>结果回到本地，旋转查看每一处细节。</p>
+        <div class="input-tabs" role="group" aria-label="照片来源"><button id="upload-tab" aria-pressed="true">上传照片</button><button id="sample-tab" aria-pressed="false">内置样本</button></div>
+        <div id="upload-input">
+          <label id="dropzone" class="dropzone" for="photos"><svg><use href="#icon-upload"/></svg><strong>点击选择或拖入照片</strong><span>4–16 张 · JPG / PNG / WEBP</span><input id="photos" type="file" accept="image/jpeg,image/png,image/webp,image/bmp,image/tiff" multiple></label>
+        </div>
+        <div id="sample-input" hidden><label class="field-label" for="sample-select">样本组</label><select id="sample-select"><option value="">正在读取样本…</option></select><p id="sample-hint" class="subtle-note">选择一组本地照片，直接发起重建。</p></div>
+        <div id="thumbnails" class="thumbnails" aria-label="待提交的照片"></div>
+        <div id="files-toolbar" class="files-toolbar" hidden><span id="file-size"></span><button id="clear-files" class="text-button">清空照片</button></div>
+        <label class="field-label gender-label" for="gender">装配模板</label><select id="gender"><option value="female">女性模板</option><option value="male">男性模板</option></select>
+        <p class="photo-guidance">建议包含正面、左右侧面；同一个人、表情自然，避免遮挡和强烈阴影。</p>
+        <button id="submit" class="button primary" disabled><svg><use href="#icon-cube"/></svg><span>发送到服务器重建</span><span class="button-arrow">↗</span></button>
+        <p id="submit-hint" class="subtle-note">连接服务后，选择至少 4 张照片。</p>
+      </section>
+      <section class="task-section" aria-labelledby="task-title">
+        <div class="section-heading"><span class="step-number">02</span><h2 id="task-title">当前任务</h2><span id="task-pill" class="status-pill">未开始</span></div>
+        <div class="task-progress" aria-hidden="true"><i></i><i></i><i></i></div>
+        <p id="task-message" class="task-message" role="status" aria-live="polite">选择照片后，开始第一次远端重建。</p>
+        <div id="job-identity" class="job-identity" hidden><code id="job-id"></code><button id="copy-job" class="icon-button" title="复制任务 ID" aria-label="复制任务 ID"><svg><use href="#icon-copy"/></svg></button></div>
+        <dl id="job-details" class="job-details" hidden><div><dt>任务耗时</dt><dd id="elapsed">—</dd></div><div><dt>结果回调</dt><dd id="callback-state">等待</dd></div></dl>
+        <button id="retry" class="button secondary" hidden>继续读取同一任务</button>
+        <details class="resume-section"><summary>打开已有任务</summary><label for="resume-id">任务 ID</label><div class="resume-input"><input id="resume-id" type="text" autocomplete="off" spellcheck="false" placeholder="粘贴任务 ID" maxlength="128"><button id="resume" class="button secondary">打开</button></div><p>刷新页面会恢复当前任务，不会重复提交。</p></details>
+        <div class="recent-heading"><span>最近任务</span><button id="refresh-jobs" class="text-button">刷新</button></div><div id="recent-jobs" class="recent-jobs"><p class="subtle-note">正在读取…</p></div>
+      </section>
+      <div class="sidebar-footer"><span class="tiny-dot"></span><span id="remote-address">远端执行 · 本地查看</span></div>
+    </aside>
+    <section class="studio" aria-labelledby="preview-title">
+      <header class="studio-header"><div><span class="eyebrow">ASSET VIEWPORT</span><h2 id="preview-title">三维预览 <span id="preview-label">等待资产</span></h2></div><div class="mode-switch" role="group" aria-label="显示模式"><button data-mode="textured" aria-pressed="true" disabled>纹理</button><button data-mode="clay" aria-pressed="false" disabled>灰模</button><button data-mode="wireframe" aria-pressed="false" disabled>线框</button></div></header>
+      <div id="comparison" class="comparison">
+        <div class="viewport-shell">
+          <div id="viewport" class="viewport"></div>
+          <div id="viewport-overlay" class="viewport-overlay"><div class="empty-graphic"><svg><use href="#icon-cube"/></svg></div><span class="eyebrow">PHOTOS → GEOMETRY → ASSET</span><h3 id="overlay-title">从多角度照片到三维头部</h3><p id="overlay-message">上传照片，或选择内置样本。<br>远端完成后，自动载入三维结果。</p></div>
+          <div class="viewport-topnote"><span class="live-dot"></span><span id="viewport-state">本地 Three.js 预览</span></div>
+          <div class="view-controls" role="group" aria-label="观察角度"><button data-view="front" disabled>正面</button><button data-view="left" disabled>左侧</button><button data-view="right" disabled>右侧</button><button data-view="back" disabled>背面</button><span></span><button id="reset-view" title="重置视角" aria-label="重置视角" disabled><svg><use href="#icon-reset"/></svg></button></div>
+          <div class="viewport-help">拖动旋转 · 滚轮缩放 · 右键平移</div>
+        </div>
+        <aside id="source-panel" class="source-panel" hidden aria-label="源照片对照"><div class="source-heading"><span class="eyebrow">SOURCE PHOTO</span><span id="source-count"></span></div><figure><img id="source-image" alt="源照片"><figcaption id="source-name"></figcaption></figure><div id="source-thumbnails" class="source-thumbnails"></div><p id="source-caption">选择照片，对照正面与侧面细节。</p></aside>
+      </div>
+      <div class="studio-tools"><label class="rotate-control"><input id="auto-rotate" type="checkbox" disabled><span>自动旋转</span></label><label class="exposure-control" for="exposure"><span>预览曝光</span><input id="exposure" type="range" min="0.4" max="1.8" step="0.05" value="1" disabled><output id="exposure-value">1.00</output></label><button id="screenshot" class="text-button" disabled><svg><use href="#icon-camera"/></svg>保存视图</button></div>
+      <footer class="asset-panel"><div class="asset-description"><span class="eyebrow">LEGACY ASSET</span><h3 id="asset-name">尚未生成资产</h3><p id="asset-description">完成后可查看模型，并下载旧版协议的 ZIP 资产包。</p></div><dl class="asset-stats"><div><dt>源顶点</dt><dd id="source-vertices">—</dd></div><div><dt>渲染顶点</dt><dd id="render-vertices">—</dd></div><div><dt>三角面</dt><dd id="face-count">—</dd></div><div><dt>材质</dt><dd id="material-count">—</dd></div></dl><button id="download" class="button download" disabled><svg><use href="#icon-download"/></svg><span>下载资产 ZIP</span></button></footer>
+      <p class="asset-note">预览使用工作室灯光，曝光只影响显示。照片未覆盖的区域由模板补全。ZIP 中的法线贴图目前为中性占位图。</p>
+    </section>
+  </main>
+  <div id="notice" class="notice" role="alert" hidden><span id="notice-text"></span><button id="dismiss-notice" aria-label="关闭提示">×</button></div>
+  <noscript>请启用 JavaScript 以使用三维预览。</noscript>
+</body>
+</html>

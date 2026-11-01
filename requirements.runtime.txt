@@ -1,0 +1,25 @@
+# Use a Python 3.10 environment containing torch 2.3.1+cu121,
+# torchvision 0.18.1+cu121, pytorch3d 0.7.8 and nvdiffrast 0.4.0.
+# These additions deliberately do not replace the GPU libraries.
+numpy>=1.24,<2
+opencv-python-headless==4.10.0.84
+timm==0.9.16
+pytorch-lightning==2.4.0
+torchmetrics==1.4.3
+omegaconf==2.3.0
+environs==11.0.0
+marshmallow>=3.13,<4
+yacs==0.1.8
+scikit-image==0.24.0
+validators==0.34.0
+PyYAML==6.0.2
+fastapi==0.115.6
+uvicorn==0.34.0
+python-multipart==0.0.20
+httpx==0.28.1
+pytest==8.3.4
+matplotlib==3.9.4
+kornia==0.8.2
+torchdiffeq==0.2.5
+jsonmerge==1.9.2
+ninja==1.13.2

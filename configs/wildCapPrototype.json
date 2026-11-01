@@ -1,0 +1,14 @@
+{
+  "projectRoot": "..",
+  "workingResolution": 1024,
+  "device": "cuda",
+  "memoryPolicy": "staged",
+  "depthChunkSize": 1,
+  "textureSampling": "denseUv",
+  "useEnhancer": true,
+  "colorBalance": true,
+  "enableWildCap": true,
+  "registrationAsset": "assets/registration/wrapV1",
+  "wildCapResolution": 512,
+  "wildCapIterations": 599
+}

@@ -1,0 +1,10 @@
+name: faceappearance
+channels:
+  - conda-forge
+dependencies:
+  - python=3.10
+  - pip
+
+# Create with: conda env create -f deploy/environment.yml
+# Install GPU libraries and external assets separately; see docs/sourceSetup.md.
+# Do not copy a workstation virtualenv, shared objects or CUDA JIT cache.

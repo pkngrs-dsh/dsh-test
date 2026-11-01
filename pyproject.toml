@@ -1,0 +1,25 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "face-appearance"
+version = "0.1.0"
+description = "Modular multi-view face geometry and reflectance reconstruction prototype"
+requires-python = ">=3.10"
+dependencies = ["numpy>=1.24,<2", "Pillow>=10", "scipy>=1.11", "opencv-python-headless==4.10.0.84", "fastapi==0.115.6", "uvicorn==0.34.0", "python-multipart==0.0.20"]
+
+[project.scripts]
+face-appearance = "faceAppearance.cli:main"
+face-appearance-client = "faceAppearance.clientCli:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+faceAppearance = ["web/*.html", "web/*.css", "web/*.js", "web/*.json", "web/vendor/*", "*Web/*.html", "*Web/*.css", "*Web/*.js", "vendor/*/LICENSE", "vendor/*/SOURCES.md"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["src"]
+python_files = ["test*.py"]

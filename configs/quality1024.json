@@ -1,0 +1,11 @@
+{
+  "projectRoot": "..",
+  "workingResolution": 1024,
+  "device": "cuda",
+  "memoryPolicy": "staged",
+  "depthChunkSize": 1,
+  "textureSampling": "denseUv",
+  "useEnhancer": true,
+  "colorBalance": true,
+  "enableWildCap": false
+}

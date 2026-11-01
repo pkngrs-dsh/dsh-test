@@ -1,0 +1,11 @@
+<!doctype html>
+<html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>自适应下巴 · 多组对照</title><link rel="stylesheet" href="/styles.css"><script type="importmap">{"imports":{"three":"/viewer-common/vendor/three.module.js","three/addons/controls/OrbitControls.js":"/viewer-common/vendor/OrbitControls.js"}}</script></head>
+<body><header><span>FaceAppearance / 几何实验</span><span>本地 · 同一套规则</span></header><main>
+<h1>自适应下巴修正</h1><p class="intro">自动选择参考视角、确定修正区域与幅度。可靠性不足或几何退化时保留原结果。</p>
+<p id="status" role="status">正在读取实验…</p><nav id="cases" aria-label="选择数据组"></nav>
+<section><div class="section-head"><h2 id="case-title">照片与同视角灰模</h2><label><input id="overlay" type="checkbox"> 叠加原照片</label></div><p id="outcome"></p><div id="views" role="group" aria-label="选择拍摄视角"></div>
+<p id="view-note" class="note"></p><div class="photo-grid"><article><h3>原照片</h3><a id="photo-link" target="_blank"><img id="photo" alt="同一裁剪原照片"></a></article><article><h3>修正前</h3><a id="before-link" target="_blank"><img id="before" alt="修正前同视角灰模"></a></article><article><h3>自动修正 / 回退</h3><a id="after-link" target="_blank"><img id="after" alt="修正后同视角灰模"></a></article></div>
+<p class="note">灰模使用同一估计相机和共同光照。照片保留拍摄光照，明暗差异不等同于形状误差。</p><a id="contour-link" target="_blank">查看轮廓叠加：青色照片 · 橙色改前 · 绿色改后 ↗</a></section>
+<section><div class="section-head"><h2>同步三维对照</h2><div><button data-pose="front">参考正面</button><button data-pose="left">左侧</button><button data-pose="right">右侧</button></div></div><div class="model-grid"><article><h3>修正前</h3><div id="model-before" class="viewport" aria-label="修正前三维模型"></div></article><article><h3>自动修正 / 回退</h3><div id="model-after" class="viewport" aria-label="修正后三维模型"></div></article></div><p class="note">本轮对照皮肤几何；未重烘焙贴图、未装配眼球等附件。</p></section>
+<section><h2>各组结果</h2><div class="table-scroll"><table><thead><tr><th>数据组</th><th>用途</th><th>参考照片</th><th>处理结果</th><th>轮廓偏差 / px</th></tr></thead><tbody id="results"></tbody></table></div><p class="note">当前样本用于开发，另外五组为探索性验证；环绕组单列。自动轮廓并非人工真值，多视角参与候选选择，不是独立留出视角。</p><a id="report-link" target="_blank">查看当前组完整诊断 ↗</a></section>
+</main><script type="module" src="/app.js"></script></body></html>
