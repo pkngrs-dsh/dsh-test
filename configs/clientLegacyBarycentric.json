@@ -1,0 +1,15 @@
+{
+  "projectRoot": "..",
+  "workingResolution": 1024,
+  "device": "cuda",
+  "memoryPolicy": "staged",
+  "depthChunkSize": 1,
+  "textureSampling": "denseUv",
+  "useEnhancer": true,
+  "colorBalance": true,
+  "enableWildCap": false,
+  "enableAssembly": true,
+  "assemblyAsset": "assets/clientTemplates/legacyFemaleBarycentricV1",
+  "assemblySourceStage": "fusion",
+  "assemblyColorEncoding": "gamma2.2"
+}

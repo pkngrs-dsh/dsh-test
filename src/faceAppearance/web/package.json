@@ -1,0 +1,7 @@
+{
+  "name": "face-appearance-viewer",
+  "private": true,
+  "type": "module",
+  "description": "Buildless Three.js client served by FaceAppearance",
+  "dependencies": { "three": "0.180.0" }
+}

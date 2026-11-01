@@ -1,0 +1,53 @@
+# Local environments and generated Python files
+.venv/
+.runtimes/
+.cache/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+*.egg-info/
+build/
+dist/
+.coverage*
+htmlcov/
+*.log
+
+# Local credentials and agent settings
+.env
+.env.*
+!.env.example
+service.env
+.aws/
+.ssh/
+.codex/
+.agents/
+.publish/
+
+# External algorithms, licensed assets, inputs and experiment outputs
+/01_UVFaceFusion/
+/02_OpenDelight/
+/03_WildCap/
+/04_STFR/
+/05_MGAvatar/
+/06_MultiFLARE/
+/thirdParty/
+/_shared/
+/assets/
+/runs/
+/reports/
+/TestData/
+*.ckpt
+*.safetensors
+*.pt
+*.pth
+*.onnx
+*.npz
+*.npy
+*.pkl
+*.zip
+*.tar.gz
+
+# OS/editor local state
+.DS_Store
+.idea/
+.vscode/

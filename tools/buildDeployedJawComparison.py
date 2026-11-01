@@ -1,0 +1,250 @@
+"""Build a same-task geometry comparison around an actual deployed male ZIP.
+
+The after archive is copied byte for byte from the completed local bridge task.
+The before branch uses that request's saved pre-jaw skin, the actual delivered
+PNG payloads and pre-jaw accessory placement. It is a controlled geometry
+comparison, not an older service result or a texture rebake. No network calls,
+model inference, camera fitting or access to signed result URLs are needed.
+"""
+from __future__ import annotations
+
+import argparse
+import hashlib
+import io
+import json
+from pathlib import Path
+import re
+import shutil
+import sys
+import zipfile
+
+import numpy as np
+from PIL import Image, ImageOps
+
+ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(ROOT/'src'))
+
+from faceAppearance.artifacts import writeJson
+from faceAppearance.headAssembly import AssemblyAssets
+from faceAppearance.legacyAsset import LEGACY_FILES, exportLegacyAsset
+from faceAppearance.legacyPreviewAsset import _load
+
+
+def sha(path):
+    return hashlib.sha256(Path(path).read_bytes()).hexdigest()
+
+
+def load(path):
+    with np.load(path, allow_pickle=False) as saved:
+        return {key: saved[key].copy() for key in saved.files}
+
+
+def publicIdentity(taskRoot):
+    # Read only the bridge's public identity fields; never inspect or emit its
+    # request, result_url, signed URLs, remote staging tokens or credentials.
+    with (taskRoot/'job.json').open(encoding='utf-8') as source:
+        record = json.load(source)
+    public = {key: record.get(key) for key in
+              ('task_id', 'status', 'gender', 'assetReady', 'archive')}
+    del record
+    if (not isinstance(public['task_id'], str)
+            or re.fullmatch(r'preview-[a-f0-9]{32}', public['task_id']) is None
+            or taskRoot.name != public['task_id'] or public['gender'] != 'male'
+            or public['status'] != 'completed' or public['assetReady'] is not True):
+        raise ValueError('Expected one completed male bridge task with a downloaded asset')
+    identity = public['archive']
+    if (not isinstance(identity, dict) or not isinstance(identity.get('sha256'), str)
+            or re.fullmatch(r'[a-f0-9]{64}', identity['sha256']) is None
+            or type(identity.get('sizeBytes')) is not int or identity['sizeBytes'] <= 0):
+        raise ValueError('The bridge public archive identity is missing or invalid')
+    public['archive'] = {key: identity[key] for key in ('sha256', 'sizeBytes')}
+    return public
+
+
+def retainDeliveredPayloads(directory, delivered, export, accessoryMask):
+    """Keep actual PNG bytes and exactly retain exported accessory positions.
+
+    Local assembly/export first checks the expected material/geometry contract.
+    Equivalent PNG encodings may differ across Pillow versions, so compare
+    decoded pixels and then retain the original delivered payload bytes.
+    """
+    for name in LEGACY_FILES:
+        if not name.endswith('.png'):
+            continue
+        with Image.open(directory/name) as local:
+            with Image.open(io.BytesIO(delivered.payloads[name])) as remote:
+                if local.mode != remote.mode or not np.array_equal(np.asarray(local), np.asarray(remote)):
+                    raise ValueError(f'Before assembly changed the delivered texture pixels: {name}')
+        (directory/name).write_bytes(delivered.payloads[name])
+    # Avoid an extra centimeters/meters rounding step on frozen accessories.
+    # Other OBJ records, face order, UVs and material assignments stay intact.
+    obj = directory/'face_nicp.obj'
+    lines = obj.read_text(encoding='utf-8').splitlines()
+    vertex = 0
+    for index, line in enumerate(lines):
+        if line.startswith('v '):
+            if accessoryMask[vertex]:
+                lines[index] = 'v '+' '.join(format(float(v), '.17g')
+                    for v in delivered.mesh['vertices'][vertex])
+            vertex += 1
+    if vertex != len(accessoryMask):
+        raise ValueError('Exported OBJ vertex order changed')
+    obj.write_text('\n'.join(lines)+'\n', encoding='utf-8')
+    manifestPath = directory/'legacyManifest.json'
+    manifest = json.loads(manifestPath.read_text(encoding='utf-8'))
+    manifest['files'] = {name: {'sha256': sha(directory/name), 'bytes': (directory/name).stat().st_size}
+                         for name in LEGACY_FILES}
+    writeJson(manifestPath, manifest)
+    entries = [*LEGACY_FILES, 'legacyManifest.json']
+    archivePath = directory/'legacyAsset.zip'
+    with zipfile.ZipFile(archivePath, 'w', compression=zipfile.ZIP_DEFLATED) as archive:
+        for name in entries:
+            archive.write(directory/name, arcname=name)
+    export.update(archiveSha256=sha(archivePath), sizeBytes=archivePath.stat().st_size,
+        manifestSha256=sha(manifestPath),
+        files=[{'name': name, 'size': (directory/name).stat().st_size} for name in entries])
+    writeJson(directory/'archive.json', export)
+    return export
+
+
+def main():
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument('--task-root', type=Path, required=True)
+    parser.add_argument('--source', type=Path, required=True,
+                        help='The downloaded reconstruction directory of this server task')
+    parser.add_argument('--output', type=Path, required=True)
+    args = parser.parse_args()
+    taskRoot, source, output = (p.resolve() for p in (args.task_root, args.source, args.output))
+    if output.exists():
+        raise FileExistsError('Choose a new comparison output directory')
+    public = publicIdentity(taskRoot)
+    archivePath = taskRoot/'asset.zip'
+    actualIdentity = {'sha256': sha(archivePath), 'sizeBytes': archivePath.stat().st_size}
+    if actualIdentity != public['archive']:
+        raise ValueError('Actual task ZIP differs from the bridge public archive identity')
+    delivered = _load(archivePath)
+    assets = AssemblyAssets(ROOT/'assets/clientTemplates/legacyMaleDirectServiceV1')
+    if (delivered.manifest['templateId'] != assets.manifest['templateId']
+            or delivered.manifest['templateHashes'] != assets.manifest['templateHashes']):
+        raise ValueError('Delivered archive does not use the expected male direct template')
+    paths = {
+        'inputs': source/'inputs.json', 'cameras': source/'cameras.json',
+        'geometry': source/'directClient/geometry.npz',
+        'texture': source/'directClient/texture.npz',
+        'jawGeometry': source/'directClient/renderedJaw/geometry.npz',
+        'jawReport': source/'directClient/renderedJaw/report.json',
+        'transform': source/'directClient/renderedJaw/templateToUff.json',
+    }
+    frozen = {key: sha(path) for key, path in paths.items()}
+    inputs = json.loads(paths['inputs'].read_text(encoding='utf-8'))
+    cameras = json.loads(paths['cameras'].read_text(encoding='utf-8'))
+    if len(inputs) != len(cameras) or len(inputs) != 4:
+        raise ValueError('The existing photo-evidence renderer requires four ordered views')
+    photos = []
+    for index, item in enumerate(inputs):
+        photoPath = taskRoot/f'{index:02d}.image'
+        if sha(photoPath) != item['sha256']:
+            raise ValueError(f'Downloaded source does not match this bridge photo: view {index}')
+        with Image.open(photoPath) as opened:
+            oriented = ImageOps.exif_transpose(opened)
+            if list(oriented.size) != item['orientedSize']:
+                raise ValueError(f'Original photo dimensions differ: view {index}')
+        photos.append({'viewIndex': index, 'sha256': item['sha256']})
+    transform = json.loads(paths['transform'].read_text(encoding='utf-8'))
+    exportedTransform = delivered.manifest['assemblyDiagnostics']['templateToUff']
+    for key in ('rotation', 'translation', 'scale'):
+        if not np.array_equal(np.asarray(transform[key]), np.asarray(exportedTransform[key])):
+            raise ValueError(f'Task ZIP and downloaded reconstruction differ in {key}')
+    jaw, finalGeometry, texture = (load(paths[key]) for key in ('jawGeometry', 'geometry', 'texture'))
+    jawReport = json.loads(paths['jawReport'].read_text(encoding='utf-8'))
+    if jawReport.get('method') != 'frontWeightedSafeV1':
+        raise ValueError('Source report does not describe the deployed jaw policy')
+    if not np.array_equal(jaw['after'], finalGeometry['vertices']):
+        raise ValueError('Final client geometry differs from the saved jaw output')
+    arrays = assets.arrays
+    for key in ('faces', 'uvFaces', 'materialIds'):
+        if not np.array_equal(delivered.mesh[key], arrays[key]):
+            raise ValueError(f'Delivered full-template identity differs: {key}')
+    if not np.allclose(delivered.mesh['uvs'], arrays['uvs'], rtol=0, atol=1e-15):
+        raise ValueError('Delivered UVs differ from the fixed template')
+    if not np.array_equal(jaw['faces'], arrays['nicpFaces']):
+        raise ValueError('Saved jaw geometry uses different skin topology')
+    fullLookup = {tuple(face): i for i, face in enumerate(arrays['faces'])}
+    skinFaces = np.array([fullLookup[tuple(face)]
+        for face in arrays['nicpToFullIds'][arrays['nicpFaces']]], np.int64)
+    beforeGeometry = {'vertices': jaw['before'], 'faces': arrays['nicpFaces'],
+                      'uvs': arrays['uvs'], 'uvFaces': arrays['uvFaces'][skinFaces]}
+    linear = texture.pop('linearAlbedo')
+    assembly = assets.assembleFinalClientSurface(beforeGeometry, transform, linear, texture,
+        accessoryReferenceCanonical=jaw['before'],
+        diagnostics={'comparison': 'Pre-jaw geometry with the same delivered final texture',
+                     'taskId': public['task_id'], 'cameraRefitted': False, 'textureRebaked': False,
+                     'actualDeliveredArchiveSha256': actualIdentity['sha256']})
+    nonSkin = np.ones(len(arrays['vertices']), bool)
+    nonSkin[arrays['nicpToFullIds']] = False
+    accessoryError = float(np.abs(assembly['geometry']['vertices'][nonSkin]*.01
+                                  -delivered.mesh['vertices'][nonSkin]).max(initial=0.))
+    if accessoryError > 1e-13:
+        raise ValueError('Actual delivered accessory positions differ from the pre-jaw placement')
+    rotation, translation = (np.asarray(transform[key]) for key in ('rotation', 'translation'))
+    finalCm = ((jaw['after']-translation)@rotation.T)/transform['scale']
+    finalCm[arrays['staticMask']] = arrays['vertices'][arrays['nicpToFullIds']][arrays['staticMask']]
+    finalError = float(np.abs(finalCm*.01-delivered.mesh['vertices'][arrays['nicpToFullIds']]).max(initial=0.))
+    if finalError > 1e-13:
+        raise ValueError('Delivered skin does not match the downloaded final geometry')
+    changedCount = int(np.any(jaw['before'] != jaw['after'], axis=1).sum())
+    if changedCount != jawReport.get('changedVertexCount'):
+        raise ValueError('Saved jaw report and geometry disagree about changed vertices')
+    if jawReport.get('selectedCandidateId') == 'noop' and changedCount:
+        raise ValueError('No-op jaw report contains changed geometry')
+    output.mkdir(parents=True)
+    beforeExport = exportLegacyAsset(output/'before', assembly, gender='male')
+    beforeExport = retainDeliveredPayloads(output/'before', delivered, beforeExport, nonSkin)
+    (output/'after').mkdir()
+    shutil.copyfile(archivePath, output/'after/legacyAsset.zip')
+    if sha(output/'after/legacyAsset.zip') != public['archive']['sha256']:
+        raise ValueError('Actual after archive changed during copying')
+    beforeAsset = _load(output/'before/legacyAsset.zip')
+    if not np.array_equal(beforeAsset.mesh['vertices'][nonSkin], delivered.mesh['vertices'][nonSkin]):
+        raise ValueError('Controlled comparison moved a delivered accessory')
+    for name in LEGACY_FILES:
+        if name.endswith('.png') and beforeAsset.payloads[name] != delivered.payloads[name]:
+            raise ValueError(f'Controlled comparison changed texture bytes: {name}')
+    if any(sha(path) != frozen[key] for key, path in paths.items()):
+        raise ValueError('Downloaded source changed while building comparison')
+    resultLabel = '已采用下颌修正' if changedCount else '下颌保持原样'
+    config = {
+        'title': '服务器新任务 · 正面下颌后处理', 'brand': '线上实际结果',
+        'badge': '同一任务 · '+resultLabel,
+        'subtitle': '右侧是本次服务器实际交付资产；左侧仅还原下颌处理前几何，使用同一最终贴图和附件。',
+        'branches': [{'id': 'before', 'label': '修正前几何 · 同一最终贴图'},
+                     {'id': 'after', 'label': '服务器实际交付 · '+resultLabel}],
+        'defaultLeft': 'before', 'defaultRight': 'after',
+        'defaultViewerMode': 'baseColor', 'defaultRenderMode': 'baseColor',
+        'overviewDescription': '本次四张原照片与保存相机下的受控几何对照；右侧直接使用真实服务器 ZIP。',
+        'notes': [
+            {'title': '本次处理结果', 'text': f"{jawReport.get('status')}；选择 {jawReport.get('selectedCandidateId')}；{changedCount} 个皮肤顶点变化。"},
+            '左侧是本任务后处理前几何配合同一最终贴图的对照，没有重跑旧版本或重新烘焙。',
+            '两侧 PNG 载荷逐字节相同，附件位置相同；只有皮肤几何发生变化。',
+            '照片与相机来自本次真实请求，未为了对照重新对齐；共同光照没有拟合照片光照。',
+            '自动采用只表示满足本轮正面语义和几何约束，其他角度用于观察。'],
+    }
+    writeJson(output/'config.json', config)
+    writeJson(output/'report.json', {
+        'status': 'complete', 'task': public, 'sourceDirectory': str(source),
+        'sourceHashes': frozen, 'photos': photos, 'templateToUff': transform,
+        'afterArchiveCopiedByteForByte': True, 'afterArchive': actualIdentity,
+        'beforeArchive': beforeExport, 'beforeMeaning': 'Same-task pre-jaw geometry with identical delivered PNGs; no old-service rerun or rebaking',
+        'sourceFinalGeometryMaximumErrorMeters': finalError,
+        'accessoryAssemblyMaximumRoundTripErrorMeters': accessoryError,
+        'accessoryVerticesExactlyEqual': True, 'texturePayloadsExactlyEqual': True,
+        'jawStatus': jawReport.get('status'), 'selectedCandidateId': jawReport.get('selectedCandidateId'),
+        'changedVertexCount': changedCount, 'selectedLiveCheck': jawReport.get('selectedLiveCheck'),
+        'cameraRefitted': False, 'textureRebaked': False})
+    print(json.dumps({'status': 'complete', 'output': str(output), 'taskId': public['task_id'],
+        'jawStatus': jawReport.get('status'), 'changedVertexCount': changedCount,
+        'afterArchiveSha256': actualIdentity['sha256']}, ensure_ascii=False), flush=True)
+
+
+if __name__ == '__main__':
+    main()

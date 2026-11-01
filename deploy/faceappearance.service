@@ -1,0 +1,22 @@
+[Unit]
+Description=FaceAppearance legacy-protocol reconstruction service
+After=network-online.target
+Wants=network-online.target
+StartLimitIntervalSec=180
+StartLimitBurst=3
+
+[Service]
+Type=simple
+WorkingDirectory=/opt/faceappearance/current
+EnvironmentFile=/opt/faceappearance/shared/service.env
+ExecStart=/opt/faceappearance/current/deploy/run-legacy.sh
+Restart=on-failure
+RestartSec=10
+TimeoutStopSec=900
+KillSignal=SIGTERM
+UMask=0077
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=default.target

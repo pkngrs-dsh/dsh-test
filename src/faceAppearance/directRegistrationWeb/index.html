@@ -1,0 +1,18 @@
+<!doctype html>
+<html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="referrer" content="same-origin"><title>直接配准 · 本地实验对照</title><link rel="icon" href="data:,"><link rel="stylesheet" href="./styles.css"><script type="importmap">{"imports":{"three":"/viewer-common/vendor/three.module.js"}}</script><script type="module" src="./app.js"></script></head>
+<body>
+<header><a href="./" class="brand"><b>F<span>·</span></b><div>FaceAppearance<small>直接配准 · 几何对照</small></div></a><span class="experiment-badge">本地实验 · 候选未部署</span></header>
+<main>
+  <section class="heading"><div><span class="eyebrow">DIRECT REGISTRATION STUDY</span><h1>同一份几何，比较不同配准</h1><p>两边共用镜头、灯光与坐标系。先看嘴部，再检查整体。</p></div><div class="case-picker"><label for="case-select">实验样本</label><select id="case-select" disabled><option>正在读取…</option></select><button id="reload" class="text-button">刷新结果</button></div></section>
+  <aside class="audit-banner" role="status"><strong>本轮尚未达到部署标准</strong><span id="audit-summary">正在读取非邻接面交叠审计。所有候选均保留在本地实验中。</span></aside>
+  <section class="toolbar" aria-label="共同预览设置"><div class="sync"><span></span>旋转与缩放同步</div><div class="control-group" aria-label="渲染模式"><button data-mode="clay" aria-pressed="true">灰模</button><button data-mode="wireframe" aria-pressed="false">线框</button></div><div class="control-group" aria-label="共同观察角度"><button data-view="front">正面</button><button data-view="left">左侧</button><button data-view="right">右侧</button><button id="mouth-focus">嘴部聚焦</button><button id="reset-view">全脸</button></div><label class="exposure">曝光 <input id="exposure" type="range" min="0.4" max="1.8" step="0.05" value="1"><output id="exposure-value">1.00</output></label></section>
+  <div class="comparison">
+    <section class="panel"><div class="panel-heading"><div><span class="eyebrow">LEFT</span><label for="left-branch">左侧几何</label></div><select id="left-branch" disabled></select></div><div class="viewport-shell"><div id="left-viewport" class="viewport"></div><span id="left-tag" class="view-tag">原生参考</span><span class="view-hint">拖动旋转 · 滚轮缩放 · 右键平移</span></div><div id="left-metrics" class="metrics"></div></section>
+    <section class="panel"><div class="panel-heading"><div><span class="eyebrow">RIGHT</span><label for="right-branch">右侧几何</label></div><select id="right-branch" disabled></select></div><div class="viewport-shell"><div id="right-viewport" class="viewport"></div><span id="right-tag" class="view-tag">本地候选</span><span class="view-hint">两个视窗始终保持同一镜头</span></div><div id="right-metrics" class="metrics"></div></section>
+  </div>
+  <div id="status" class="status" role="status" aria-live="polite">正在读取本地实验结果…</div>
+  <section class="facts"><div><span class="eyebrow">EXPERIMENT NOTES</span><h2 id="case-title">实验信息</h2><p id="case-description"></p><p>仅显示皮肤几何，不含纹理、眼球与附件。所有分支使用同一基线模板厘米坐标，未为候选单独做显示对齐。</p><p>“相对模板翻面”是法向方向变化，不是自交判定。非邻接面穿插 / 交叠另用三角面求交统计：包含正长度交线和共面正面积重叠，排除共享顶点的面与零面积接触。</p><p>原模板也有既存交叠。相对原模板和 A 的“新增对数”按面索引对集合比较，不是总数相减；总数较少也可能新增其他位置的穿插。所有分支均不能据此视为稳定通过。</p></div><div class="downloads"><a id="mouth-image" target="_blank" rel="noopener">查看嘴部重点对照 · UFF / A / E / F</a><a id="mouth-all" target="_blank" rel="noopener">查看嘴部全部分支</a><a id="face-image" target="_blank" rel="noopener">查看全脸固定视角对照</a><a id="mesh-download" download>下载全部分支几何 NPZ</a></div></section>
+  <details class="method"><summary>配准方法与实验范围</summary><p id="objective"></p><p id="solver"></p><p>A 为当前 UV 搬运；B 为旧先验权重 1000；C 为弱先验 100；D 为去掉形状先验；E 为去掉形状先验并固定接口；F 在 E 基础上减小平滑。配准目标与求解器的具体差异以实验报告为准。这里展示本地候选，尚未替换稳定服务。</p></details>
+</main>
+<noscript>请启用 JavaScript 查看三维几何。</noscript>
+</body></html>
